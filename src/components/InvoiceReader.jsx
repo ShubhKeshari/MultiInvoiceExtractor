@@ -7,22 +7,27 @@ import "jspdf-autotable";
 // import { createRoot } from "react-dom/client";
 // import ReactDOMServer from "react-dom/server";
 // import html2canvas from "html2canvas";
-
+import { jsPDF } from "jspdf";
+import * as pdfjsLib from "pdfjs-dist";
 // Set worker source to match the installed version
 GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
 
 const InvoiceReader = ({ pdfFile }) => {
   const [invoices, setInvoices] = useState([]);
-
+  const [imgSrc, setImgSrc] = useState([]);
   useEffect(() => {
     const extractInvoices = async () => {
       const pdf = await getDocument(URL.createObjectURL(pdfFile)).promise;
+      //console.log("PDF", pdf);
       const invoiceData = [];
       const separatorRegex = /Page No\s+\d+\s+of\s+\d+/i;
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
+        //console.log("textContent", textContent);
+
         const pageText = textContent.items.map((item) => item.str).join(" ");
+        //console.log("pagewiseText", pageText);
 
         //console.log("Extracted Text for Page", i, pageText);
 
@@ -65,6 +70,7 @@ const InvoiceReader = ({ pdfFile }) => {
                 customerName: customerName || "N/A",
                 customerId: customerId || "N/A",
                 salesman: salesman || "N/A",
+                pageNo: i,
               });
             } else if (currentPage === 1) {
               invoiceNumber = pageText.match(
@@ -93,20 +99,9 @@ const InvoiceReader = ({ pdfFile }) => {
               if (invoiceData.length > 0) {
                 invoiceData[invoiceData.length - 1].totalAmount =
                   totalAmount || "N/A";
+                invoiceData[invoiceData.length - 1].pageNo = i;
               }
             }
-            // if (invoiceNumber && totalAmount) {
-            //   invoiceData.push({
-            //     invoiceNumber: invoiceNumber || "N/A",
-            //     invoiceDate: invoiceDate || "N/A",
-            //     totalAmount: totalAmount || "N/A",
-            //     customerName: customerName || "N/A",
-            //     customerId: customerId || "N/A",
-            //     salesman: salesman || "N/A",
-            //   });
-            // } else {
-            //   console.warn(`Incomplete essential details on Page ${i}`);
-            // }
           } else {
             console.log("Page no. not found");
           }
@@ -122,94 +117,89 @@ const InvoiceReader = ({ pdfFile }) => {
     }
   }, [pdfFile]);
 
- 
-  
-  // const generatePDF = async () => {
-  //   const doc = new jsPDF();
-  //   // Generate table data with serial number and QR code info
-  //   const tableData = invoices.map((invoice, index) => [
-  //     index + 1, // Sl No. (serial number)
-  //     invoice.invoiceNumber,
-  //     invoice.invoiceDate,
-  //     invoice.totalAmount,
-  //     invoice.customerName,
-  //     invoice.customerId,
-  //     invoice.salesman,
-  //     invoice, // Pass the entire invoice object to the QR code column
-  //   ]);
+  const getImage = (DataQR) => {
+    setImgSrc((prev) => [...prev, DataQR]);
+  };
 
-  //   // Define columns for the table (including QR code column)
-  //   const columns = [
-  //     { title: "Sl No.", dataKey: "slNo" },
-  //     { title: "Invoice Number", dataKey: "invoiceNumber" },
-  //     { title: "Invoice Date", dataKey: "invoiceDate" },
-  //     { title: "Total Amount", dataKey: "totalAmount" },
-  //     { title: "Customer Name", dataKey: "customerName" },
-  //     { title: "Customer ID", dataKey: "customerId" },
-  //     { title: "Salesman", dataKey: "salesman" },
-  //     { title: "QR Code", dataKey: "qrCode" }, // New column for QR Code
-  //   ];
+  const generatePDF = () => {
+    if (!pdfFile) {
+      alert("Please upload a PDF file first");
+      return;
+    }
+    console.log("this is all image", imgSrc);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const pdfData = new Uint8Array(reader.result);
 
-  //   // Temporary hidden container for QR codes
-  //   const qrContainer = document.createElement("div");
-  //   qrContainer.style.display = "none";
-  //   document.body.appendChild(qrContainer);
+      // Load the PDF document using pdf.js
+      const pdfDoc = await pdfjsLib.getDocument(pdfData).promise;
+      const pageCount = pdfDoc.numPages;
 
-  //   const qrPromises = []; // Array to track QR code rendering promises
+      // Initialize jsPDF instance to create a new PDF
+      const doc = new jsPDF();
 
-  //   doc.autoTable({
-  //     head: [columns.map((col) => col.title)], // Table headers
-  //     body: tableData, // Table data
-  //     didDrawCell: (data) => {
-  //       if (data.column.index === 7) {
-  //         const invoice = data.row.cells[7].raw; // Get the entire invoice object
-  //         const qrId = `qrCode-${data.row.index}`; // Unique ID for the QR code container
+      // Load the image that you want to add to each page
 
-  //         const qrCodeElement = document.createElement("div");
-  //         qrCodeElement.id = qrId;
-  //         qrContainer.appendChild(qrCodeElement);
+      const imageWidth = 50; // Image width (in mm)
+      const imageHeight = 50; // Image height (in mm)
 
-  //         // Render QR code in the hidden container
-  //         const root = createRoot(qrCodeElement);
-  //         root.render(
-  //           <QRCodeCanvas value={JSON.stringify(invoice)} size={128} />
-  //         );
+      // Iterate over all pages of the loaded PDF
+      for (let i = 1; i <= pageCount; i++) {
+        const page = await pdfDoc.getPage(i);
+        let fltr = imgSrc.filter((item) => item.pageNo == i);
+        let imageSrc;
+        if (fltr.length > 0) {
+          imageSrc = fltr[0].img;
+        }
+        // Render the PDF page into a canvas
+        const viewport = page.getViewport({ scale: 1 });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
 
-  //         // Create a promise for capturing the QR code
-  //         const qrPromise = new Promise((resolve) => {
-  //           setTimeout(() => {
-  //             const canvas = qrCodeElement.querySelector("canvas");
-  //             if (canvas) {
-  //               const qrCodeDataUrl = canvas.toDataURL("image/png"); // Get PNG image
-  //               const x = data.cell.x + 2; // Adjust X position
-  //               const y = data.cell.y + 2; // Adjust Y position
-  //               const width = 13; // Width of QR code
-  //               const height = 13; // Height of QR code
+        await page.render({
+          canvasContext: context,
+          viewport: viewport,
+        }).promise;
 
-  //               doc.addImage(qrCodeDataUrl, "PNG", x, y, width, height);
-  //               resolve(); // Resolve the promise after adding the image
-  //             } else {
-  //               console.error("Canvas element not found for QR code.");
-  //               resolve(); // Resolve even in error to avoid hanging promises
-  //             }
-  //           }, 500); // Allow time for rendering
-  //         });
+        // Add the existing page content to the new PDF
+        if (i > 1) {
+          doc.addPage();
+        }
+      
+          doc.addImage(
+            canvas,
+            "PNG",
+            0,
+            0,
+            canvas.width * 0.264583,
+            canvas.height * 0.264583
+          );
 
-  //         qrPromises.push(qrPromise); // Add the promise to the array
-  //       }
-  //     },
-  //   });
+        // Get the height of the page to place the image at the bottom
+        const pageHeight = doc.internal.pageSize.height;
 
-  //   // Wait for all QR codes to be rendered and added to the PDF
-  //   await Promise.all(qrPromises);
+        // Add image at the bottom of each page
+        if (fltr.length > 0) {
+          doc.addImage(
+            imageSrc,
+            "PNG",
+            10,
+            pageHeight - imageHeight - 10,
+            imageWidth,
+            imageHeight
+          );
+        }
+      }
 
-  //   // Clean up hidden container
-  //   qrContainer.remove();
+      // Save the new PDF with the image added
+      doc.save("output.pdf");
+    };
 
-  //   // Save the PDF
-  //   doc.save("invoices.pdf");
-  // };
-  
+    reader.readAsArrayBuffer(pdfFile);
+  };
+
   return (
     <div>
       <h2>Extracted Invoices</h2>
@@ -217,7 +207,7 @@ const InvoiceReader = ({ pdfFile }) => {
         <p>No invoices found.</p>
       ) : (
         <>
-          {/* <button onClick={generatePDF}>Generate PDF</button> */}
+          <button onClick={generatePDF}>Add Image to Existing PDF</button>
           <table>
             <thead>
               <tr>
@@ -242,7 +232,7 @@ const InvoiceReader = ({ pdfFile }) => {
                   <td>{invoice.customerId}</td>
                   <td>{invoice.salesman}</td>
                   <td>
-                    <QRCodeDisplay data={invoice} />
+                    <QRCodeDisplay data={invoice} getImage={getImage} />
                   </td>
                 </tr>
               ))}
