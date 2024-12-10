@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import QRCodeDisplay from "./QRCodeDisplay";
-//import { jsPDF } from "jspdf"; // Import jsPDF
 import "jspdf-autotable";
-// import { QRCodeCanvas } from "qrcode.react";
-// import { createRoot } from "react-dom/client";
-// import ReactDOMServer from "react-dom/server";
-// import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
 // Set worker source to match the installed version
@@ -126,7 +121,7 @@ const InvoiceReader = ({ pdfFile }) => {
       alert("Please upload a PDF file first");
       return;
     }
-    console.log("this is all image", imgSrc);
+    //console.log("this is all image", imgSrc);
     const reader = new FileReader();
     reader.onload = async () => {
       const pdfData = new Uint8Array(reader.result);

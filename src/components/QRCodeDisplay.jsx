@@ -1,13 +1,10 @@
 import React, {
-  forwardRef,
   useEffect,
-  useImperativeHandle,
   useRef,
-  useState,
 } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 
-const QRCodeDisplay = forwardRef((props, ref) => {
+const QRCodeDisplay =((props) => {
   //const qrData = JSON.stringify(data);
 
   const { data, getImage} = props;
@@ -40,15 +37,10 @@ const QRCodeDisplay = forwardRef((props, ref) => {
     const downoladPng = () => {
       const qrcanvas = qrref.current.querySelector("canvas");
       const img = qrcanvas.toDataURL("image/png");
-      console.log("img", img);
+      //console.log("img", img);
       getImage({img:img,
         pageNo: props.data.pageNo
       });
-      // const D = document.createElement("a");
-      // D.href= img;
-      // D.download = "qr.png";
-      // document.body.appendChild(D);
-      // D.click();
     };
     const timer = setTimeout(() => {
       downoladPng();
@@ -57,20 +49,11 @@ const QRCodeDisplay = forwardRef((props, ref) => {
 
     return () => clearTimeout(timer); // Cleanup
   }, []);
-
-  useImperativeHandle(ref, () => ({
-    getImageElement: () => imgRef.current, // Send back the <img> element
-    highlightImage: () => {
-      imgRef.current.style.border = "2px solid red";
-    },
-  }));
-
   return (
     <>
       <div ref={qrref}>
         <QRCodeCanvas value={qrData} size={100} />
       </div>
-      {/* <button onClick={downoladPng}></button> */}
     </>
   );
 });
